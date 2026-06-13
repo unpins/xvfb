@@ -100,7 +100,8 @@ c.xorg-server.overrideAttrs (o: {
   # bin/xvfb into bin/xvfb.exe.
   postInstall = (o.postInstall or "") + ''
     rm -f $out/bin/X
-    mv $out/bin/Xvfb $out/bin/xvfb
+    mv $out/bin/Xvfb $out/bin/xvfb.unpin-tmp
+    mv $out/bin/xvfb.unpin-tmp $out/bin/xvfb
   '';
 
   # apelinkHook (preFixup) renames xvfb -> xvfb.exe. We must embed the /zip data

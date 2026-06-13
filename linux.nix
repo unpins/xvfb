@@ -55,9 +55,12 @@ static.xorg-server.overrideAttrs (old: {
   # Ship the binary as `xvfb` (== package name, required by action-build's
   # name-based verify/smoke); `Xvfb` is re-added as an embedded alias. xorg=false
   # so the only bin is Xvfb (drop the dangling X → Xorg symlink if present).
+  # Two-step rename via a temp name so it works on a case-insensitive FS too
+  # (uniform with the darwin module; a direct mv Xvfb->xvfb is "same file" there).
   postInstall = (old.postInstall or "") + ''
     rm -f $out/bin/X
-    mv $out/bin/Xvfb $out/bin/xvfb
+    mv $out/bin/Xvfb $out/bin/xvfb.unpin-tmp
+    mv $out/bin/xvfb.unpin-tmp $out/bin/xvfb
   '';
 
   buildInputs = builtins.filter (x: !dropGL x) (old.buildInputs or [ ])

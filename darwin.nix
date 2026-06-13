@@ -82,9 +82,13 @@ in
   # name-based verify/smoke); `Xvfb` is re-added as an embedded alias. The
   # postBuild relink targets hw/vfb/Xvfb in the build dir (unchanged); this only
   # renames the installed copy.
+  # Two-step rename via a temp name: macOS's default FS is CASE-INSENSITIVE, so a
+  # direct `mv Xvfb xvfb` is "same file" and errors. The temp differs in more than
+  # case, so it works on both case-insensitive (darwin) and case-sensitive (linux).
   postInstall = (old.postInstall or "") + ''
     rm -f $out/bin/X
-    mv $out/bin/Xvfb $out/bin/xvfb
+    mv $out/bin/Xvfb $out/bin/xvfb.unpin-tmp
+    mv $out/bin/xvfb.unpin-tmp $out/bin/xvfb
   '';
 
   # Drop bootstrap_cmds from the HOST inputs: xorg-server lists it for Xquartz's
