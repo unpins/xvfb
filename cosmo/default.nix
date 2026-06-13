@@ -95,11 +95,19 @@ c.xorg-server.overrideAttrs (o: {
                      "conf_data.set('XTRANS_SEND_FDS', false)"
   '';
 
-  # apelinkHook (preFixup) renames Xvfb -> Xvfb.exe. We must embed the /zip data
+  # Ship the binary as `xvfb` (== package name, required by action-build's
+  # name-based verify/smoke). Rename BEFORE preFixup so apelinkHook turns
+  # bin/xvfb into bin/xvfb.exe.
+  postInstall = (o.postInstall or "") + ''
+    rm -f $out/bin/X
+    mv $out/bin/Xvfb $out/bin/xvfb
+  '';
+
+  # apelinkHook (preFixup) renames xvfb -> xvfb.exe. We must embed the /zip data
   # AFTER that, in postFixup, so the appended zip rides on the final .exe. The
   # binary isn't stripped (apelink needs .symtab; dontStrip via the hook).
   postFixup = (o.postFixup or "") + ''
-    bin=$out/bin/Xvfb.exe
+    bin=$out/bin/xvfb.exe
     [ -f "$bin" ] || { echo "FATAL: $bin not found (apelink failed?)" >&2; exit 1; }
 
     stage=$(mktemp -d)

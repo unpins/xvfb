@@ -78,9 +78,13 @@ in
       --replace-fail "subdir('test')" "# subdir('test') removed (unpins: not shipped)"
   '';
 
+  # Ship the binary as `xvfb` (== package name, required by action-build's
+  # name-based verify/smoke); `Xvfb` is re-added as an embedded alias. The
+  # postBuild relink targets hw/vfb/Xvfb in the build dir (unchanged); this only
+  # renames the installed copy.
   postInstall = (old.postInstall or "") + ''
     rm -f $out/bin/X
-    ln -s Xvfb $out/bin/X
+    mv $out/bin/Xvfb $out/bin/xvfb
   '';
 
   # Drop bootstrap_cmds from the HOST inputs: xorg-server lists it for Xquartz's

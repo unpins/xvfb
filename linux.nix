@@ -52,6 +52,14 @@ static.xorg-server.overrideAttrs (old: {
       ${xkbcompObj}/xkbcomp_localized.o"
   '';
 
+  # Ship the binary as `xvfb` (== package name, required by action-build's
+  # name-based verify/smoke); `Xvfb` is re-added as an embedded alias. xorg=false
+  # so the only bin is Xvfb (drop the dangling X → Xorg symlink if present).
+  postInstall = (old.postInstall or "") + ''
+    rm -f $out/bin/X
+    mv $out/bin/Xvfb $out/bin/xvfb
+  '';
+
   buildInputs = builtins.filter (x: !dropGL x) (old.buildInputs or [ ])
     ++ [ static.libmd ];
   propagatedBuildInputs =

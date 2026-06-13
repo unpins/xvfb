@@ -12,11 +12,11 @@ single self-contained binary, built natively for Linux, macOS, and Windows.
 
 Part of the [unpins](https://unpins.org) catalog; install it with [`unpin`](https://github.com/unpins/unpin): `unpin install xvfb`.
 
-The binary is `Xvfb` (capital X), the standard X-server name.
+The binary is `xvfb`; `Xvfb` (the familiar capital-X server name) is installed as an alias.
 
 ## Usage
 
-Run `Xvfb` with [unpin](https://github.com/unpins/unpin):
+Run `xvfb` with [unpin](https://github.com/unpins/unpin):
 
 ```bash
 unpin xvfb :99 -screen 0 1280x1024x24 &   # start a virtual display :99
@@ -45,7 +45,7 @@ no `XKB`/keymap directory, no font path, no companion files to ship:
 
 ```bash
 nix build github:unpins/xvfb
-./result/bin/Xvfb -help
+./result/bin/xvfb -help
 ```
 
 Or run directly:
@@ -90,7 +90,7 @@ The [Releases](https://github.com/unpins/xvfb/releases) page has standalone bina
     dynamic darwin stdenv but with every linked library swapped to its
     `pkgsStatic` `.a`, yielding a libSystem-only Mach-O.
   - **Windows** via [Cosmopolitan](https://github.com/jart/cosmopolitan): the
-    same X server compiled to an APE and apelinked to a `Xvfb.exe` PE32+, with
+    same X server compiled to an APE and apelinked to an `xvfb.exe` PE32+, with
     the data served from the APE's native `/zip`.
 
 - **Headless only.** This is `Xvfb` (virtual framebuffer), not a GPU/seat server

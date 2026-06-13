@@ -141,7 +141,13 @@
       # framework skips its own withMan (one pack).
       build = pkgs:
         unpins-lib.lib.withUnpinEmbed pkgs {
-          primary = "Xvfb";
+          # The binary must be named `xvfb` (== the package name): action-build's
+          # manifest only carries `name`, so its verify/smoke steps look for
+          # result/bin/xvfb. The X server doesn't dispatch on its filename, so we
+          # rename the upstream `Xvfb` → `xvfb` in each module's postInstall and
+          # ship `Xvfb` as an alias for the familiar X name.
+          primary = "xvfb";
+          aliases = [ "Xvfb" ];
           man = true;
           inherit runtimeStage;
         } (buildServer pkgs);
@@ -158,8 +164,6 @@
     unpins-lib.lib.mkStandaloneFlake {
       inherit self;
       name = "xvfb";
-      # The shipped binary is `Xvfb` (capital); the repo/attr name is `xvfb`.
-      binName = "Xvfb";
       # nixpkgs attr for the man graft / optimize overlay. xorg-server has no
       # clean top-level attr we want optimized, and the build is bespoke, so GC
       # is off; man is harvested from the build's own share/man.
