@@ -90,7 +90,7 @@ The [Releases](https://github.com/unpins/xvfb/releases) page has standalone bina
     dynamic darwin stdenv but with every linked library swapped to its
     `pkgsStatic` `.a`, yielding a libSystem-only Mach-O.
   - **Windows** via [Cosmopolitan](https://github.com/jart/cosmopolitan): the
-    same X server compiled to an APE and apelinked to an `xvfb.exe` PE32+, with
+    same X server, with
     the data served from cosmo's native `/zip`.
 
 - **Headless only.** This is `Xvfb` (virtual framebuffer), not a GPU/seat server
