@@ -78,7 +78,7 @@ The [Releases](https://github.com/unpins/xvfb/releases) page has standalone bina
   Linux the libc file calls are routed through the VFS with `ld --wrap`; on macOS
   (no `--wrap` for Mach-O) the server's own objects are rewritten with
   `llvm-objcopy --redefine-sym` and relinked; on Windows the data lives in the
-  Cosmopolitan APE's native `/zip` store. A live X server reads from the in-binary
+  Cosmopolitan's native `/zip` store. A live X server reads from the in-binary
   mount only — no `/nix/store`, no system XKB/font directory.
 
 - **Three platform paths, one binary each.**
@@ -91,7 +91,7 @@ The [Releases](https://github.com/unpins/xvfb/releases) page has standalone bina
     `pkgsStatic` `.a`, yielding a libSystem-only Mach-O.
   - **Windows** via [Cosmopolitan](https://github.com/jart/cosmopolitan): the
     same X server compiled to an APE and apelinked to an `xvfb.exe` PE32+, with
-    the data served from the APE's native `/zip`.
+    the data served from cosmo's native `/zip`.
 
 - **Headless only.** This is `Xvfb` (virtual framebuffer), not a GPU/seat server
   — it renders to memory, needs no root, KMS, or DRM, and serves the core bitmap
