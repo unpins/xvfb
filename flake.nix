@@ -135,22 +135,20 @@
             xk = import ./linux-xkbcomp.nix { inherit static pkgs; };
           in import ./linux.nix { inherit static pkgs dropGL; xkbcompObj = xk; };
 
-      # mkStandaloneFlake `build`: wrap the server in withUnpinEmbed — one self-EOF
-      # ZIP carrying the xkb/font runtime tree + the Xvfb man page, appended after
-      # the framework's strip. man=true sets passthru.unpinEmbedsMan so the
-      # framework skips its own withMan (one pack).
-      build = pkgs:
-        unpins-lib.lib.withUnpinEmbed pkgs {
-          # The binary must be named `xvfb` (== the package name): action-build's
-          # manifest only carries `name`, so its verify/smoke steps look for
-          # result/bin/xvfb. The X server doesn't dispatch on its filename, so we
-          # rename the upstream `Xvfb` → `xvfb` in each module's postInstall and
-          # ship `Xvfb` as an alias for the familiar X name.
-          primary = "xvfb";
-          aliases = [ "Xvfb" ];
-          man = true;
-          inherit runtimeStage;
-        } (buildServer pkgs);
+      # mkStandaloneFlake `build`: the PRISTINE server (no embed). The xkb/font
+      # runtime tree + Xvfb alias + man are embedded once, post-build, via
+      # runtimeEmbed.native → unpinEmbedWrap (one self-EOF ZIP, the single embed
+      # path). The binary must be named `xvfb` (== binName): action-build looks
+      # for result/bin/xvfb; the X server doesn't dispatch on its filename, so the
+      # upstream `Xvfb` is renamed → `xvfb` in each module's postInstall and shipped
+      # as the `Xvfb` alias. Windows is cosmo (cosmo/) which embeds xkb/fonts via
+      # its own zipos in-build, so only man is added there (the framework default).
+      build = pkgs: buildServer pkgs;
+      runtimeEmbed.native = pkgs: base: {
+        aliases = [ "Xvfb" ];
+        man = true;
+        inherit runtimeStage;
+      };
 
       # Windows: the cosmo cross set with the xvfb leaf fixes layered on, feeding
       # the cosmo Xvfb module (its own zipos embed for xkb/fonts; the framework
@@ -171,7 +169,7 @@
       license = "MIT";
       optimize = { gc = false; };
 
-      inherit build windowsBuild;
+      inherit build windowsBuild runtimeEmbed;
 
       # Xvfb is a server; `-help` prints its usage to stderr and exits 0. Pattern
       # on an Xvfb-specific option so the smoke proves it's Xvfb, not any X.
