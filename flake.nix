@@ -168,6 +168,12 @@
       pkgsAttr = "xorg-server";
       license = "MIT";
       optimize = { gc = false; };
+      # The xserver bakes `$out/lib/xorg/protocol.txt` into the binary, but this
+      # build installs only bin/ — the path never exists. Harmless as a
+      # self-reference in the pristine base; once unpinEmbedWrap copies the binary
+      # into its own output it becomes a real dependency on the base (measured:
+      # one ref, to the base, on x86_64-linux). Scrub it.
+      removeReferences = [ "xvfb" ];
 
       inherit build windowsBuild runtimeEmbed;
 
