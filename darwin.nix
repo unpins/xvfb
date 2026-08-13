@@ -16,7 +16,7 @@
 # aarch64-darwin, native on its own runner or cross from the other); `xkbcompObj`
 # is the matching darwin-xkbcomp.nix blob. Build-host tools come from
 # pkgs.buildPackages so cross-darwin uses an executable toolchain.
-{ pkgs, xkbcompObj }:
+{ ulib, pkgs, xkbcompObj }:
 let
   static = pkgs.pkgsStatic;
   bpkgs = pkgs.buildPackages;
@@ -107,10 +107,10 @@ in
     vfsdir=$NIX_BUILD_TOP/vfsobj
     mkdir -p $vfsdir
     $CC -O2 -DNDEBUG -DMINIZ_USE_ZSTD -DUNPIN_VFS_SELF -DUNPIN_VFS_DIRS \
-      -I${./src} -c ${./src/vfs.c} -o $vfsdir/vfs.o
-    $CC -O2 -DNDEBUG -DMINIZ_USE_ZSTD -I${./src} -c ${./src/miniz.c} -o $vfsdir/miniz.o
-    $CC -O2 -DNDEBUG -DMINIZ_USE_ZSTD -DUNPIN_ZSTD_VENDORED -I${./src} \
-      -c ${./src/unpin_zstd.c} -o $vfsdir/unpin_zstd.o
+      -I${ulib.vfsCore} -c ${ulib.vfsCore}/vfs.c -o $vfsdir/vfs.o
+    $CC -O2 -DNDEBUG -DMINIZ_USE_ZSTD -I${ulib.vfsCore} -c ${ulib.vfsCore}/miniz.c -o $vfsdir/miniz.o
+    $CC -O2 -DNDEBUG -DMINIZ_USE_ZSTD -DUNPIN_ZSTD_VENDORED -I${ulib.vfsCore} \
+      -c ${ulib.vfsCore}/unpin_zstd.c -o $vfsdir/unpin_zstd.o
 
     ###### VFS-localized copies of the external font lib + the xkbcomp blob ######
     cp ${libxfont2NoFt}/lib/libXfont2.a $vfsdir/libXfont2_vfs.a

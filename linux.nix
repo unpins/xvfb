@@ -7,7 +7,7 @@
 # `static` is a target static-musl pkg set (native or cross) with staticFixes;
 # `pkgs` is the build-host nixpkgs; `xkbcompObj` is the matching linux-xkbcomp.nix
 # blob; `dropGL` filters the GL stack out of buildInputs.
-{ static, pkgs, xkbcompObj, dropGL }:
+{ ulib, static, pkgs, xkbcompObj, dropGL }:
 static.xorg-server.overrideAttrs (old: {
   pname = "xvfb";
   nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.bison ];
@@ -37,10 +37,10 @@ static.xorg-server.overrideAttrs (old: {
   preBuild = (old.preBuild or "") + ''
     ###### unpin-vfs runtime objects (static musl $CC) ######
     $CC -O2 -DMINIZ_USE_ZSTD -DUNPIN_VFS_SELF -DUNPIN_VFS_DIRS \
-      -I${./src} -c ${./src/vfs.c} -o vfs.o
-    $CC -O2 -DMINIZ_USE_ZSTD -I${./src} -c ${./src/miniz.c} -o miniz.o
-    $CC -O2 -DMINIZ_USE_ZSTD -DUNPIN_ZSTD_VENDORED -I${./src} \
-      -c ${./src/unpin_zstd.c} -o unpin_zstd.o
+      -I${ulib.vfsCore} -c ${ulib.vfsCore}/vfs.c -o vfs.o
+    $CC -O2 -DMINIZ_USE_ZSTD -I${ulib.vfsCore} -c ${ulib.vfsCore}/miniz.c -o miniz.o
+    $CC -O2 -DMINIZ_USE_ZSTD -DUNPIN_ZSTD_VENDORED -I${ulib.vfsCore} \
+      -c ${ulib.vfsCore}/unpin_zstd.c -o unpin_zstd.o
 
     ###### wire the final Xvfb link ######
     # The xkbcomp object is fully self-contained; the server link just adds it +
