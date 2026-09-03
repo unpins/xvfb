@@ -8,6 +8,21 @@
 # `pkgs` is the build-host nixpkgs; `xkbcompObj` is the matching linux-xkbcomp.nix
 # blob; `dropUnused` filters inputs the server never links out of buildInputs.
 { ulib, static, pkgs, xkbcompObj, dropUnused }:
+let
+  # 32-bit musl is _REDIR_TIME64: <sys/stat.h> asm-labels stat/lstat to
+  # __stat_time64/__lstat_time64, so the server's stat() references THOSE and a
+  # plain --wrap=stat never fires. Miss the pair and a stat() on a /zip path
+  # reaches the real filesystem on i686/armv7l only, while the 64-bit targets
+  # stay green — the worst shape of bug. vim and gvim have carried it from the
+  # start; xvfb did not. Latent when added, and measured so: server startup AND
+  # a client font-list on i686 + armv7l make zero /zip syscalls today. This
+  # closes the divergence, it does not fix a live failure.
+  is32 = static.stdenv.hostPlatform.is32bit;
+  time64Def = pkgs.lib.optionalString is32 " -DUNPIN_WRAP_TIME64";
+  time64Wrap = pkgs.lib.optionalString is32 ''
+    export NIX_LDFLAGS="$NIX_LDFLAGS --wrap=__stat_time64 --wrap=__lstat_time64"
+  '';
+in
 static.xorg-server.overrideAttrs (old: {
   pname = "xvfb";
   nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.bison ];
@@ -41,7 +56,7 @@ static.xorg-server.overrideAttrs (old: {
     # live runtime reference. gcc -O2 elided it, so this build was ref-clean
     # without NDEBUG until the engine put Linux on clang; darwin has carried the
     # flag from the start for exactly this reason.
-    $CC -O2 -DNDEBUG -DMINIZ_USE_ZSTD -DUNPIN_VFS_SELF -DUNPIN_VFS_DIRS \
+    $CC -O2 -DNDEBUG -DMINIZ_USE_ZSTD -DUNPIN_VFS_SELF -DUNPIN_VFS_DIRS${time64Def} \
       -I${ulib.vfsCore} -c ${ulib.vfsCore}/vfs.c -o vfs.o
     $CC -O2 -DNDEBUG -DMINIZ_USE_ZSTD -I${ulib.vfsCore} -c ${ulib.vfsCore}/miniz.c -o miniz.o
     $CC -O2 -DNDEBUG -DMINIZ_USE_ZSTD -DUNPIN_ZSTD_VENDORED -I${ulib.vfsCore} \
@@ -55,7 +70,7 @@ static.xorg-server.overrideAttrs (old: {
       --wrap=fopen --wrap=opendir --wrap=readdir --wrap=closedir \
       $PWD/vfs.o $PWD/miniz.o $PWD/unpin_zstd.o \
       ${xkbcompObj}/xkbcomp_localized.o"
-  '';
+  '' + time64Wrap;
 
   # Ship the binary as `xvfb` (== package name, required by action-build's
   # name-based verify/smoke); `Xvfb` is re-added as an embedded alias. xorg=false

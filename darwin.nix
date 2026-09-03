@@ -38,25 +38,16 @@ let
     // (builtins.listToAttrs (map (n: { name = n; value = static.${n}; }) staticArgs))
     // { libxfont_2 = libxfont2NoFt; };
 
-  # The redefine map. On x86_64-darwin the stat/dir family carries the $INODE64
-  # asm-label suffix; map both suffixed and bare (objcopy ignores absent ones).
-  # arm64-darwin uses the PLAIN forms, so the bare lines cover it. Do NOT add
-  # _DARWIN_C_SOURCE anywhere — it makes stdio emit _fopen$DARWIN_EXTSN, which
-  # this map (and the server objects) would then miss → VFS bypassed.
-  redefMap = pkgs.writeText "vfs-redef.map" ''
-    _open _unpinvfs_open
-    _stat$INODE64 _unpinvfs_stat
-    _stat _unpinvfs_stat
-    _lstat$INODE64 _unpinvfs_lstat
-    _lstat _unpinvfs_lstat
-    _access _unpinvfs_access
-    _fopen _unpinvfs_fopen
-    _opendir$INODE64 _unpinvfs_opendir
-    _opendir _unpinvfs_opendir
-    _readdir$INODE64 _unpinvfs_readdir
-    _readdir _unpinvfs_readdir
-    _closedir _unpinvfs_closedir
-  '';
+  # The redefine map, generated from nix-lib's ONE spelling table (lib.vfsBindMap)
+  # — the same table the engine's IR rename reads, so the two back-ends can never
+  # drift apart. On x86_64-darwin the stat/dir family carries the $INODE64
+  # asm-label suffix and arm64-darwin uses the PLAIN forms; both are emitted
+  # (objcopy ignores absent ones). Do NOT add _DARWIN_C_SOURCE anywhere — it makes
+  # stdio emit _fopen$DARWIN_EXTSN, which this map (and the server objects) would
+  # then miss -> VFS bypassed.
+  redefMap = pkgs.writeText "vfs-redef.map" (ulib.vfsBindMap {
+    syms = [ "open" "stat" "lstat" "access" "fopen" "opendir" "readdir" "closedir" ];
+  });
 in
 (pkgs.xorg-server.override overrides).overrideAttrs (old: {
   pname = "xvfb";
