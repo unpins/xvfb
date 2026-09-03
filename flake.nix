@@ -42,6 +42,25 @@
           '';
           mesonFlags = (o.mesonFlags or [ ]) ++ [ "-Ddefault_library=static" ];
         });
+        # libx11's XORG_PROG_RAWCPP probe feeds the raw preprocessor no input;
+        # the engine cc-wrapper's `cpp` errors ("no input files") and the probe
+        # aborts ("defines unix with or without -undef") because clang keeps
+        # `unix` defined even under -undef. Point RAWCPP at the build-host cpp,
+        # which honors it; RAWCPP only preprocesses X11's host-independent
+        # locale/compose text, so libx11 still links in as the same static .a.
+        # Same fix ddcutil/sox/vorbis-tools/poppler-utils/fastfetch carry.
+        libx11 = superP.libx11.overrideAttrs (_: {
+          RAWCPP = "${selfP.buildPackages.stdenv.cc}/bin/cpp";
+        });
+        # pixman's test/demo programs are not shipped, and `matrix-test` does its
+        # reference math in `__float128` — whose soft-float builtins compiler-rt
+        # cannot supply on i386 (they are gated on `__int128`, which 32-bit x86
+        # lacks; libgcc had its own). Under the engine the i686 link therefore
+        # fails on __divtf3/__floatditf/__trunctfxf2/… Drop the tests, exactly as
+        # the cosmo leaf fixes below already do.
+        pixman = superP.pixman.overrideAttrs (o: {
+          mesonFlags = (o.mesonFlags or [ ]) ++ [ "-Dtests=disabled" "-Ddemos=disabled" ];
+        });
         libfontenc = superP.libfontenc.overrideAttrs (o: {
           configureFlags = (o.configureFlags or [ ]) ++ [
             "--with-fontrootdir=/zip/fonts"
@@ -73,9 +92,16 @@
       # badPlatforms=static, so keeping them would need allowUnsupportedSystem
       # (the spike's crutch) — dropping is cleaner and shrinks the closure. The
       # cosmo path already drops the same set as "junk".
-      dropGL = x:
+      # libtirpc joins the list for the same reason: the build already passes
+      # `-Dsecure-rpc=false`, so the server never calls it, but nixpkgs keeps it
+      # as a buildInput — and it drags krb5, whose `krb5kdc` fails to link under
+      # the engine (lld: undefined `malloc`, "defined in: krb5kdc.lto.o"). We
+      # ship no KDC and no secure RPC, so the dep is dead weight either way; the
+      # darwin path already nulls the same class of unused input.
+      dropUnused = x:
         builtins.elem (x.pname or x.name or "")
-          [ "libepoxy" "libglvnd" "glu" "mesa-libgbm" "libpciaccess" "libxshmfence" ];
+          [ "libepoxy" "libglvnd" "glu" "mesa-libgbm" "libpciaccess" "libxshmfence"
+            "libtirpc" ];
 
       # Cosmo (Windows) leaf fixes — same intent as staticFixes, retargeted to the
       # cosmocc cross set. libxfont2 needs no FreeType backend (PCF fonts only);
@@ -132,9 +158,12 @@
           in import ./darwin.nix { inherit ulib pkgs; xkbcompObj = xk; }
         else
           let
-            static = pkgs.pkgsStatic.extend staticFixes;
+            static = (ulib.enginePkgsStaticFor {
+              inherit pkgs;
+              toolchain = ulib.unpinToolchain pkgs.stdenv.buildPlatform.system;
+            }).extend staticFixes;
             xk = import ./linux-xkbcomp.nix { inherit static pkgs; };
-          in import ./linux.nix { inherit ulib static pkgs dropGL; xkbcompObj = xk; };
+          in import ./linux.nix { inherit ulib static pkgs dropUnused; xkbcompObj = xk; };
 
       # mkStandaloneFlake `build`: the PRISTINE server (no embed). The xkb/font
       # runtime tree + Xvfb alias + man are embedded once, post-build, via

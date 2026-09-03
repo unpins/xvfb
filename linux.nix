@@ -6,8 +6,8 @@
 #
 # `static` is a target static-musl pkg set (native or cross) with staticFixes;
 # `pkgs` is the build-host nixpkgs; `xkbcompObj` is the matching linux-xkbcomp.nix
-# blob; `dropGL` filters the GL stack out of buildInputs.
-{ ulib, static, pkgs, xkbcompObj, dropGL }:
+# blob; `dropUnused` filters inputs the server never links out of buildInputs.
+{ ulib, static, pkgs, xkbcompObj, dropUnused }:
 static.xorg-server.overrideAttrs (old: {
   pname = "xvfb";
   nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.bison ];
@@ -36,10 +36,15 @@ static.xorg-server.overrideAttrs (old: {
 
   preBuild = (old.preBuild or "") + ''
     ###### unpin-vfs runtime objects (static musl $CC) ######
-    $CC -O2 -DMINIZ_USE_ZSTD -DUNPIN_VFS_SELF -DUNPIN_VFS_DIRS \
+    # -DNDEBUG: miniz's MZ_ASSERT is plain assert(), and clang keeps its __FILE__
+    # cstring — the vfsCore store path — in .rodata, where it survives strip as a
+    # live runtime reference. gcc -O2 elided it, so this build was ref-clean
+    # without NDEBUG until the engine put Linux on clang; darwin has carried the
+    # flag from the start for exactly this reason.
+    $CC -O2 -DNDEBUG -DMINIZ_USE_ZSTD -DUNPIN_VFS_SELF -DUNPIN_VFS_DIRS \
       -I${ulib.vfsCore} -c ${ulib.vfsCore}/vfs.c -o vfs.o
-    $CC -O2 -DMINIZ_USE_ZSTD -I${ulib.vfsCore} -c ${ulib.vfsCore}/miniz.c -o miniz.o
-    $CC -O2 -DMINIZ_USE_ZSTD -DUNPIN_ZSTD_VENDORED -I${ulib.vfsCore} \
+    $CC -O2 -DNDEBUG -DMINIZ_USE_ZSTD -I${ulib.vfsCore} -c ${ulib.vfsCore}/miniz.c -o miniz.o
+    $CC -O2 -DNDEBUG -DMINIZ_USE_ZSTD -DUNPIN_ZSTD_VENDORED -I${ulib.vfsCore} \
       -c ${ulib.vfsCore}/unpin_zstd.c -o unpin_zstd.o
 
     ###### wire the final Xvfb link ######
@@ -63,10 +68,10 @@ static.xorg-server.overrideAttrs (old: {
     mv $out/bin/xvfb.unpin-tmp $out/bin/xvfb
   '';
 
-  buildInputs = builtins.filter (x: !dropGL x) (old.buildInputs or [ ])
+  buildInputs = builtins.filter (x: !dropUnused x) (old.buildInputs or [ ])
     ++ [ static.libmd ];
   propagatedBuildInputs =
-    builtins.filter (x: !dropGL x) (old.propagatedBuildInputs or [ ]);
+    builtins.filter (x: !dropUnused x) (old.propagatedBuildInputs or [ ]);
   meta = (old.meta or { }) // { platforms = pkgs.lib.platforms.all; };
 
   # The VFS objects + --wrap flags ride on the GLOBAL NIX_LDFLAGS, so they apply
