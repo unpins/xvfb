@@ -162,7 +162,7 @@
               inherit pkgs;
               toolchain = ulib.unpinToolchain pkgs.stdenv.buildPlatform.system;
             }).extend staticFixes;
-            xk = import ./linux-xkbcomp.nix { inherit static pkgs; };
+            xk = import ./linux-xkbcomp.nix { inherit ulib static pkgs; engine = true; };
           in import ./linux.nix { inherit ulib static pkgs dropUnused; xkbcompObj = xk; };
 
       # mkStandaloneFlake `build`: the PRISTINE server (no embed). The xkb/font
