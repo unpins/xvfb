@@ -49,7 +49,7 @@ c.xorg-server.overrideAttrs (o: {
       (o.env.NIX_LDFLAGS or "")
       # Static single-pass link: leaf libs referenced by earlier archives
       # (libXfont2->z, libxcb->Xau/Xdmcp) must be re-listed at the end.
-      "-L${c.zlib.static}/lib" "-lz"
+      "-L${c.zlib}/lib" "-lz"
       "-L${c.xorg.libXau}/lib" "-lXau"
       "-L${c.xorg.libXdmcp}/lib" "-lXdmcp"
       # The self-contained in-process xkbcomp blob (exports only
