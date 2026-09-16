@@ -148,6 +148,22 @@
         chmod -R u+w "$__unpin_stage"
       '';
 
+      # The one man page shipped: Xvfb's own. xorg-server also installs
+      # `Xserver.1`, and every embedded page names a program — so it was
+      # announced as a second command, `unpin install` linked an `Xserver` that
+      # does not exist, and `--unpin-program=Xserver` exited 1. The generic
+      # server options it documents are upstream's Xserver(1), linked from the
+      # README. The text is arch-independent (read from the x86_64-linux
+      # xorg-server, byte-identical to the page this build installs), but the
+      # runCommand runs on each target's build host, as in xvnc.
+      manSrc = "${dataPkgs.xorg-server}/share/man/man1/Xvfb.1.gz";
+      mkCuratedMan = pkgs: pkgs.buildPackages.runCommand "xvfb-man" { } ''
+        mkdir -p $out/share/man/man1
+        gzip -dc ${manSrc} > $out/share/man/man1/Xvfb.1
+      '';
+      # Windows always cross-builds on x86_64-linux.
+      curatedMan = mkCuratedMan dataPkgs;
+
       # The bare server derivation for a target pkg set: Linux static-musl or the
       # macOS dynamic-base build (branch on the platform). Does NOT embed data or
       # strip — withUnpinEmbed (below) does that uniformly.
@@ -172,12 +188,18 @@
       # for result/bin/xvfb; the X server doesn't dispatch on its filename, so the
       # upstream `Xvfb` is renamed → `xvfb` in each module's postInstall and shipped
       # as the `Xvfb` alias. Windows is cosmo (cosmo/) which embeds xkb/fonts via
-      # its own zipos in-build, so only man is added there (the framework default).
+      # its own zipos in-build, so only man and the alias are added there.
       build = pkgs: buildServer pkgs;
       runtimeEmbed.native = pkgs: base: {
         aliases = [ "Xvfb" ];
         man = true;
+        manRoot = "${mkCuratedMan pkgs}";
         inherit runtimeStage;
+      };
+      # The `Xvfb` alias on Windows too; without it the .exe announced no alias
+      # at all while Linux and macOS did.
+      runtimeEmbed.windows = pkgs: base: {
+        aliases = [ "Xvfb" ];
       };
 
       # Windows: the cosmo cross set with the xvfb leaf fixes layered on, feeding
@@ -204,6 +226,7 @@
       # into its own output it becomes a real dependency on the base (measured:
       # one ref, to the base, on x86_64-linux). Scrub it.
       removeReferences = [ "xvfb" ];
+      winManRoot = curatedMan;
 
       inherit build windowsBuild runtimeEmbed;
 

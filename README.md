@@ -29,6 +29,14 @@ To install it onto your PATH:
 unpin install xvfb
 ```
 
+On Windows the server listens on TCP instead of a local socket, so display `:N`
+is port `6000+N` and clients connect with `DISPLAY=127.0.0.1:99`.
+
+`unpin man xvfb Xvfb` covers the options specific to Xvfb (`-screen`,
+`-pixdepths`, `-fbdir`, …). The options every X server shares (`-listen`, `-fp`,
+`-ac`, `-nolisten`, …) are in upstream's
+[Xserver(1)](https://www.x.org/releases/current/doc/man/man1/Xserver.1.xhtml).
+
 Everything an X server normally reads from disk is **embedded in the binary** —
 no `XKB`/keymap directory, no font path, no companion files to ship:
 
@@ -90,8 +98,9 @@ The [Releases](https://github.com/unpins/xvfb/releases) page has standalone bina
     dynamic darwin stdenv but with every linked library swapped to its
     `pkgsStatic` `.a`, yielding a libSystem-only Mach-O.
   - **Windows** via [Cosmopolitan](https://github.com/jart/cosmopolitan): the
-    same X server, with
-    the data served from cosmo's native `/zip`.
+    same X server, with the data served from cosmo's native `/zip`. It listens
+    on TCP by default, and it has no `MIT-SHM` extension (Windows has no System V
+    shared memory).
 
 - **Headless only.** This is `Xvfb` (virtual framebuffer), not a GPU/seat server
   — it renders to memory, needs no root, KMS, or DRM, and serves the core bitmap

@@ -67,6 +67,14 @@ c.xorg-server.overrideAttrs (o: {
     # fopen/open resolve there transparently (no --wrap needed on cosmo).
     "-Dxkb_dir=/zip/xkb" "-Dxkb_bin_dir=/usr/bin" "-Dxkb_output_dir=/tmp"
     "-Ddefault_font_path=/zip/fonts/misc"
+    # Listen on TCP, not on a Unix socket, unless told otherwise. The server's
+    # stock default is Unix-only, and on Windows that socket never comes up:
+    # xtrans refuses to create /tmp/.X11-unix behind a `!defined(WIN32)` check
+    # a cosmo build does not satisfy, and creating the directory by hand does
+    # not rescue the listen either. With nothing listening the server exits
+    # `Cannot establish any listening sockets`, so `xvfb :99` failed outright
+    # and only `-listen tcp` worked. Clients reach display :N at port 6000+N.
+    "-Dlisten_tcp=true" "-Dlisten_unix=false"
   ];
 
   # Rewrite RunXkbComp -> in-process fork + unpin_xkbcomp_main (cosmo variant:

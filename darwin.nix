@@ -59,6 +59,10 @@ in
     "-Dsystemd_logind=false" "-Dsecure-rpc=false" "-Dsha1=libmd"
     "-Dxkb_dir=/zip/xkb" "-Dxkb_bin_dir=/usr/bin" "-Dxkb_output_dir=/tmp"
     "-Ddefault_font_path=/zip/fonts/misc"
+    # nixpkgs turns the SECURITY extension on for every host except darwin,
+    # with no reason given, and this list extends theirs — so the macOS server
+    # was the only one without it (21 extensions against Linux's 22).
+    "-Dxcsecurity=true"
   ];
 
   postPatch = (old.postPatch or "") + ''
