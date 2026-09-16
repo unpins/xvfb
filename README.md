@@ -44,7 +44,7 @@ no `XKB`/keymap directory, no font path, no companion files to ship:
   [`xkeyboard-config`](https://www.freedesktop.org/wiki/Software/XKeyboardConfig/)
   tree is embedded and the keymap compiler (`xkbcomp`) runs **in-process** — any
   RMLVO layout (`-keybd`, `setxkbmap`) compiles from the in-binary tree with no
-  external `xkbcomp` and nothing written to `/tmp`.
+  external `xkbcomp`.
 - **Core fonts.** `fixed`, `cursor`, and the `misc` bitmap fonts are embedded at
   the default font path, so clients that ask for the built-in fonts work with no
   font server or font directory.
@@ -76,8 +76,10 @@ The [Releases](https://github.com/unpins/xvfb/releases) page has standalone bina
   (xkbcomp's sources plus the display-free struct/IO members lifted straight from
   `libX11`/`libxkbfile`) is bundled into one self-contained object that exports a
   single entry point and depends on nothing but libc. `RunXkbComp` is patched to
-  call it in-process (fork + an in-memory spec/`.xkm` handoff), so the full RMLVO
-  → keymap pipeline runs from the embedded `xkeyboard-config` tree.
+  call it in-process (fork, then the spec and the compiled `.xkm` are handed
+  back in memory on Linux and through short-lived temp files on macOS and
+  Windows), so the full RMLVO → keymap pipeline runs from the embedded
+  `xkeyboard-config` tree.
 
 - **Embedded data via the VFS (unpin-vfs).** The server opens its XKB rules,
   symbols, and font files with `open`/`fopen`/`opendir`. The `xkeyboard-config`
