@@ -81,28 +81,17 @@ The [Releases](https://github.com/unpins/xvfb/releases) page has standalone bina
   Windows), so the full RMLVO → keymap pipeline runs from the embedded
   `xkeyboard-config` tree.
 
-- **Embedded data via the VFS (unpin-vfs).** The server opens its XKB rules,
-  symbols, and font files with `open`/`fopen`/`opendir`. The `xkeyboard-config`
-  tree and core bitmap fonts are packed into a ZIP appended at the binary's EOF
-  and served by the shared [unpin-vfs](https://github.com/unpins/unpin) core. On
-  Linux the libc file calls are routed through the VFS with `ld --wrap`; on macOS
-  (no `--wrap` for Mach-O) the server's own objects are rewritten with
-  `llvm-objcopy --redefine-sym` and relinked; on Windows the data lives in the
-  Cosmopolitan's native `/zip` store. A live X server reads from the in-binary
-  mount only — no `/nix/store`, no system XKB/font directory.
+- **Embedded data.** The XKB rules and symbols (the `xkeyboard-config` tree)
+  and the core bitmap fonts are packed into the binary. A live X server reads
+  them from there only — no `/nix/store`, no system XKB/font directory.
 
-- **Three platform paths, one binary each.**
-  - **Linux** (static-musl, every arch): the whole X server linked statically,
-    XKB + fonts embedded, `file` reports `statically linked`, no `/nix/store`
-    closure.
-  - **macOS** (Mach-O, libSystem-only): not pure `pkgsStatic` (the X stack's
-    meson/python toolchain can't link statically on macOS) — built with the
-    dynamic darwin stdenv but with every linked library swapped to its
-    `pkgsStatic` `.a`, yielding a libSystem-only Mach-O.
+- **Platforms, one binary each.**
+  - **Linux** (every arch): the whole X server linked statically, XKB + fonts
+    embedded.
+  - **macOS**: every linked library is built in.
   - **Windows** via [Cosmopolitan](https://github.com/jart/cosmopolitan): the
-    same X server, with the data served from cosmo's native `/zip`. It listens
-    on TCP by default, and it has no `MIT-SHM` extension (Windows has no System V
-    shared memory).
+    same X server. It listens on TCP by default, and it has no `MIT-SHM`
+    extension (Windows has no System V shared memory).
 
 - **Headless only.** This is `Xvfb` (virtual framebuffer), not a GPU/seat server
   — it renders to memory, needs no root, KMS, or DRM, and serves the core bitmap
