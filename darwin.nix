@@ -1,11 +1,20 @@
 # Darwin (macOS) Xvfb server derivation — self-contained, libSystem-only Mach-O.
 # NOT pure pkgsStatic (meson's pkgsStatic.python3 interpreter can't statically
 # link on macOS); build with the DYNAMIC darwin stdenv but swap the LINKED libs
-# to their pkgsStatic .a variants. VFS via llvm-objcopy --redefine-sym (macOS ld
-# has no --wrap): vfs.c's __APPLE__ branch defines unpinvfs_*; we redefine
-# _open/_fopen/... in every server object + a copy of libXfont2.a + the xkbcomp
-# blob, then relink. vfs.o/miniz.o/unpin_zstd.o are NEVER redefined (they
-# implement the real syscalls).
+# to their pkgsStatic .a variants. The COMPILER is the engine (unpin-llvm) all
+# the same: the adapter stdenv only replaces the cc, so the dynamic link model
+# macOS forces on us is untouched while the server's own code goes through the
+# engine like every other target.
+#
+# -flto makes those objects LLVM bitcode, which decides the VFS back-end per
+# input. vfs.c's __APPLE__ branch defines unpinvfs_* either way; what differs is
+# how a consumer's _open/_fopen/... are pointed at them:
+#   - the server's own archives are bitcode -> the IR rename (ulib.vfsBindFns).
+#   - libXfont2.a and the xkbcomp blob come from OFF-engine derivations and are
+#     native Mach-O -> llvm-objcopy --redefine-syms (ulib.vfsBindMap).
+# Both back-ends read the same spelling table in nix-lib, so they cannot drift.
+# vfs.o/miniz.o/unpin_zstd.o are NEVER rewritten (they implement the real
+# syscalls).
 #
 # Like linux.nix this produces ONLY the server drv (no data embed / no manual
 # strip) — the flake delegates the /zip embed to withUnpinEmbed (one self-EOF
@@ -21,6 +30,22 @@ let
   static = pkgs.pkgsStatic;
   bpkgs = pkgs.buildPackages;
   llvm = bpkgs.llvm;
+  multitool = ulib.llvmMultitool pkgs.stdenv.buildPlatform.system;
+
+  # The engine cc over the dynamic darwin stdenv. `hostPkgs = pkgs` is the whole
+  # point: engineStdenv's default wraps pkgsStatic, and on darwin pkgsStatic
+  # collapses buildPackages into itself (build config == host config), so meson
+  # would want a static python3 — the reason this module never went through
+  # pkgsStatic. Wrapping the dynamic set keeps the link model and swaps only the
+  # compiler.
+  engStdenv = ulib.unpinAdapterStdenv {
+    inherit pkgs;
+    hostPkgs = pkgs;
+    target = pkgs.stdenv.hostPlatform.config;
+    native = pkgs.stdenv.buildPlatform.system == pkgs.stdenv.hostPlatform.system;
+    lto = true;
+    captureLinks = true;
+  };
 
   libxfont2NoFt = static.libxfont_2.overrideAttrs (o: {
     configureFlags = (o.configureFlags or []) ++ [ "--disable-freetype" ];
@@ -45,11 +70,11 @@ let
   # (objcopy ignores absent ones). Do NOT add _DARWIN_C_SOURCE anywhere — it makes
   # stdio emit _fopen$DARWIN_EXTSN, which this map (and the server objects) would
   # then miss -> VFS bypassed.
-  redefMap = pkgs.writeText "vfs-redef.map" (ulib.vfsBindMap {
-    syms = [ "open" "stat" "lstat" "access" "fopen" "opendir" "readdir" "closedir" ];
-  });
+  # One list, both back-ends: what the server may reach the filesystem through.
+  vfsSyms = [ "open" "stat" "lstat" "access" "fopen" "opendir" "readdir" "closedir" ];
+  redefMap = pkgs.writeText "vfs-redef.map" (ulib.vfsBindMap { syms = vfsSyms; });
 in
-(pkgs.xorg-server.override overrides).overrideAttrs (old: {
+(pkgs.xorg-server.override (overrides // { stdenv = engStdenv; })).overrideAttrs (old: {
   pname = "xvfb";
   nativeBuildInputs = (old.nativeBuildInputs or []) ++ [ llvm ];
 
@@ -115,23 +140,31 @@ in
     llvm-objcopy --redefine-syms=${redefMap} $vfsdir/blob_vfs.o
 
     ###### wire the link ######
-    export NIX_LDFLAGS="$NIX_LDFLAGS \
-      $vfsdir/vfs.o $vfsdir/miniz.o $vfsdir/unpin_zstd.o $vfsdir/blob_vfs.o"
-    export NIX_LDFLAGS="$NIX_LDFLAGS \
+    # NIX_CFLAGS_LINK, not NIX_LDFLAGS: the cc wrapper `-Wl,`-prefixes every
+    # NIX_LDFLAGS token that does not start with `-L/`, and the engine clang does
+    # not lower `-Wl,<path>` — it hands the token to ld64.lld whole, which then
+    # reports "cannot open …/-Wl,/nix/store/…/vfs.o". NIX_CFLAGS_LINK is added
+    # raw, which is where an object path belongs anyway.
+    export NIX_CFLAGS_LINK="''${NIX_CFLAGS_LINK:-} \
+      $vfsdir/vfs.o $vfsdir/miniz.o $vfsdir/unpin_zstd.o $vfsdir/blob_vfs.o \
       -L${static.libfontenc}/lib -lfontenc -L${static.zlib}/lib -lz"
   '';
 
   postBuild = (old.postBuild or "") + ''
     ###### localize file I/O in the server archives, then relink Xvfb ######
     vfsdir=$NIX_BUILD_TOP/vfsobj
-    echo "=== redefining file I/O in server archives ==="
-    find . -name '*.a' -print | while read -r a; do
-      llvm-objcopy --redefine-syms=${redefMap} "$a" || true
-    done
+    MT=${multitool}
+    ${ulib.vfsBindFns { syms = vfsSyms; }}
+    ${ulib.vfsBindArchiveFns}
+    echo "=== renaming file I/O in server archives (IR) ==="
+    # The server's convenience archives are bitcode now, so `objcopy
+    # --redefine-syms` has no symtab to touch and would report them as not a
+    # valid object file. Rewrite the IR instead — same rename, same table.
+    find . -name '*.a' -print | while read -r a; do bcrewriteArchive "$a"; done
 
     # Replay the captured Xvfb link with libXfont2_vfs.a injected BEFORE the store
     # -lXfont2 (ld64: first archive defining a symbol wins). vfs/blob ride on
-    # NIX_LDFLAGS (re-read by the cc-wrapper on replay).
+    # NIX_CFLAGS_LINK (re-read by the cc-wrapper on replay).
     linkcmd=$(ninja -t commands hw/vfb/Xvfb | tail -1)
     if [ -z "$linkcmd" ]; then echo "FATAL: no link command for hw/vfb/Xvfb" >&2; exit 1; fi
     newcmd=$(printf '%s' "$linkcmd" | sed \
@@ -139,9 +172,16 @@ in
     echo "=== relinking Xvfb with VFS objects ==="
     eval "$newcmd"
 
-    echo "=== otool -L hw/vfb/Xvfb ==="
-    otool -L hw/vfb/Xvfb || true
-    bad=$(otool -L hw/vfb/Xvfb | tail -n +2 | awk '{print $1}' \
+    # llvm-objdump, not `otool`: the engine stdenv drops cctools (apple-sdk is
+    # nulled so the wrapper cannot re-inject ld64), so `otool` is not on PATH and
+    # the gate below read an EMPTY list and passed on nothing. --macho
+    # --dylibs-used prints otool -L's format from the llvm already listed in
+    # nativeBuildInputs, which is present on the native and the cross builder
+    # alike.
+    echo "=== dylibs used by hw/vfb/Xvfb ==="
+    llvm-objdump --macho --dylibs-used hw/vfb/Xvfb
+    bad=$(llvm-objdump --macho --dylibs-used hw/vfb/Xvfb | tail -n +2 \
+          | awk '{print $1}' \
           | grep -vE '^/usr/lib/libSystem|^/System/Library' || true)
     if [ -n "$bad" ]; then
       echo "FATAL: Xvfb links non-libSystem dylibs:" >&2; echo "$bad" >&2; exit 1

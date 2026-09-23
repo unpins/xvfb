@@ -84,10 +84,9 @@
       # cosmo path already drops the same set as "junk".
       # libtirpc joins the list for the same reason: the build already passes
       # `-Dsecure-rpc=false`, so the server never calls it, but nixpkgs keeps it
-      # as a buildInput — and it drags krb5, whose `krb5kdc` fails to link under
-      # the engine (lld: undefined `malloc`, "defined in: krb5kdc.lto.o"). We
-      # ship no KDC and no secure RPC, so the dep is dead weight either way; the
-      # darwin path already nulls the same class of unused input.
+      # as a buildInput, and it drags krb5 into the closure. We ship no KDC and
+      # no secure RPC, so the dep is dead weight; the darwin path already nulls
+      # the same class of unused input.
       dropUnused = x:
         builtins.elem (x.pname or x.name or "")
           [ "libepoxy" "libglvnd" "glu" "mesa-libgbm" "libpciaccess" "libxshmfence"
