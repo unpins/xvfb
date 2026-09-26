@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [21.1.24-1] - 2026-09-26
+
 Initial release — Xvfb from `xorg-server` 21.1.22 as a single self-contained
 binary, built natively for Linux, macOS, and Windows.
 
