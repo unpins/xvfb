@@ -90,10 +90,14 @@ The [Releases](https://github.com/unpins/xvfb/releases) page has standalone bina
     embedded.
   - **macOS**: every linked library is built in.
   - **Windows** via [Cosmopolitan](https://github.com/jart/cosmopolitan): the
-    same X server. It listens on TCP by default, and it has no `MIT-SHM`
-    extension (Windows has no System V shared memory).
+    same X server. Cosmopolitan provides the `fork()` the in-process keymap
+    compiler needs, which the native Windows toolchain lacks. It listens on TCP
+    by default, and it has no `MIT-SHM` extension (Windows has no System V
+    shared memory).
 
 - **Headless only.** This is `Xvfb` (virtual framebuffer), not a GPU/seat server
   — it renders to memory, needs no root, KMS, or DRM, and serves the core bitmap
-  fonts. GL/GLX/DRI3/glamor are disabled; clients needing GLX get software
-  rendering only where the client provides it.
+  fonts. GL/GLX/DRI3/glamor are disabled, because the GL stack (libglvnd,
+  Mesa) loads its drivers at run time and can't be built into a single static
+  binary; clients needing GLX get software rendering only where the client
+  provides it.
