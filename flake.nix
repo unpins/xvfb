@@ -69,7 +69,6 @@
           system = bp.system;
           config = {
             allowUnsupportedSystem = true;
-            allowBroken = true;
             problems.handlers.python3.broken = "ignore";
           };
         } // lib.optionalAttrs (hp != bp) { crossSystem = { config = hp.config; }; });
