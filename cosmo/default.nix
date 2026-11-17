@@ -48,12 +48,13 @@ c.xorg-server.overrideAttrs (o: {
     NIX_LDFLAGS = builtins.concatStringsSep " " [
       (o.env.NIX_LDFLAGS or "")
       # Static single-pass link: leaf libs referenced by earlier archives
-      # (libXfont2->fontenc/freetype->png/bz2/z, libxcb->Xau/Xdmcp) must be
+      # (libXfont2->fontenc/freetype->png/bz2/brotli/z, libxcb->Xau/Xdmcp) must be
       # re-listed at the end.
       "-L${c.libfontenc}/lib" "-lfontenc"
       "-L${c.lib.getLib c.freetype}/lib" "-lfreetype"
       "-L${c.lib.getLib c.libpng}/lib" "-lpng16"
       "-L${c.lib.getLib c.bzip2}/lib" "-lbz2"
+      "-L${c.lib.getLib c.brotli}/lib" "-lbrotlidec" "-lbrotlicommon"
       "-L${c.zlib}/lib" "-lz"
       "-L${c.xorg.libXau}/lib" "-lXau"
       "-L${c.xorg.libXdmcp}/lib" "-lXdmcp"

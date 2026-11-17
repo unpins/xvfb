@@ -102,15 +102,19 @@
         # nixpkgs wraps freetype-config with makeWrapper, which needs a bash
         # built for the host (it skips the wrap on mingw for the same reason);
         # bash does not build for cosmo, and nothing here runs freetype-config.
-        # Brotli only decodes WOFF2, which X font paths never hold, and its
-        # static libs reach libxfont2's link without libbrotlicommon.
         freetype = prev.freetype.overrideAttrs (o: {
           nativeBuildInputs = builtins.filter
             (x: (x.name or "") != "make-shell-wrapper-hook") (o.nativeBuildInputs or []);
-          propagatedBuildInputs = builtins.filter
-            (x: (x.pname or "") != "brotli") (o.propagatedBuildInputs or []);
-          configureFlags = (o.configureFlags or []) ++ [ "--with-brotli=no" ];
           postInstall = "";
+        });
+        # Cosmo links static-only, but its pkg-config runs without --static, so
+        # libbrotlidec's Requires.private (libbrotlicommon) never reached a link:
+        # freetype's consumers died on undefined _kBrotli*. With no shared
+        # library the private deps are the public ones.
+        brotli = prev.brotli.overrideAttrs (o: {
+          postFixup = (o.postFixup or "") + ''
+            sed -i 's/^Requires.private:/Requires:/' "''${dev:-$out}"/lib/pkgconfig/libbrotli{dec,enc}.pc
+          '';
         });
         libxcvt = prev.libxcvt.overrideAttrs (o: {
           patches = (o.patches or []) ++ [ ./patches/libxcvt-static-library.patch ];
