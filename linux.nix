@@ -30,6 +30,9 @@ static.xorg-server.overrideAttrs (old: {
   mesonFlags = (old.mesonFlags or [ ]) ++ [
     "-Dxorg=false" "-Dxephyr=false" "-Dxnest=false" "-Dxvfb=true"
     "-Dglamor=false" "-Ddri3=false" "-Dglx=false" "-Dsecure-rpc=false"
+    # Device hotplug and seat management are for servers that drive real input
+    # and display hardware; Xvfb has neither. nixpkgs' own xvfb turns them off.
+    "-Dudev=false" "-Dudev_kms=false" "-Dsystemd_logind=false"
     # XKB + fonts live in the embedded VFS at /zip; the server reads them via
     # fopen (routed through --wrap) and the patched RunXkbComp compiles in-process.
     "-Dxkb_dir=/zip/xkb" "-Dxkb_bin_dir=/usr/bin" "-Dxkb_output_dir=/tmp"

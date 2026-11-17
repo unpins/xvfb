@@ -80,11 +80,12 @@
       # `-Dsecure-rpc=false`, so the server never calls it, but nixpkgs keeps it
       # as a buildInput, and it drags krb5 into the closure. We ship no KDC and
       # no secure RPC, so the dep is dead weight; the darwin path already nulls
-      # the same class of unused input.
+      # the same class of unused input. libudev-zero and dbus go with udev and
+      # systemd-logind, which linux.nix turns off.
       dropUnused = x:
         builtins.elem (x.pname or x.name or "")
           [ "libepoxy" "libglvnd" "glu" "mesa-libgbm" "libpciaccess" "libxshmfence"
-            "libtirpc" ];
+            "libtirpc" "libudev-zero" "dbus" ];
 
       # Cosmo (Windows) leaf fixes — same intent as staticFixes, retargeted to the
       # cosmocc cross set. libxfont2 needs no FreeType backend (PCF fonts only);
