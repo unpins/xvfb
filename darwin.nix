@@ -27,7 +27,16 @@
 # pkgs.buildPackages so cross-darwin uses an executable toolchain.
 { ulib, pkgs, xkbcompObj }:
 let
-  static = pkgs.pkgsStatic;
+  # libfontenc bakes its encodings dir into the binary as a store path; point
+  # it at the embedded tree, as staticFixes does on Linux.
+  static = pkgs.pkgsStatic.extend (_: super: {
+    libfontenc = super.libfontenc.overrideAttrs (o: {
+      configureFlags = (o.configureFlags or [ ]) ++ [
+        "--with-fontrootdir=/zip/fonts"
+        "--with-encodingsdir=/zip/fonts/encodings"
+      ];
+    });
+  });
   bpkgs = pkgs.buildPackages;
   llvm = bpkgs.llvm;
   multitool = ulib.llvmMultitool pkgs.stdenv.buildPlatform.system;
