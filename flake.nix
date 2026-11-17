@@ -88,16 +88,31 @@
             "libtirpc" "libudev-zero" "dbus" ];
 
       # Cosmo (Windows) leaf fixes — same intent as staticFixes, retargeted to the
-      # cosmocc cross set. libxfont2 needs no FreeType backend (PCF fonts only);
-      # libxcvt static; pixman drops the libpng/zlib-probing demos/tests.
+      # cosmocc cross set. libxcvt static; pixman drops the libpng/zlib-probing
+      # demos/tests.
       xvfbCosmoFixes = final: prev: {
-        libxfont_2 = prev.libxfont_2.overrideAttrs (o: {
-          configureFlags = (o.configureFlags or []) ++ [ "--disable-freetype" ];
-          buildInputs = builtins.filter
-            (x: (x.pname or x.name or "") != "freetype") (o.buildInputs or []);
+        # nixpkgs wraps freetype-config with makeWrapper, which needs a bash
+        # built for the host (it skips the wrap on mingw for the same reason);
+        # bash does not build for cosmo, and nothing here runs freetype-config.
+        # Brotli only decodes WOFF2, which X font paths never hold, and its
+        # static libs reach libxfont2's link without libbrotlicommon.
+        freetype = prev.freetype.overrideAttrs (o: {
+          nativeBuildInputs = builtins.filter
+            (x: (x.name or "") != "make-shell-wrapper-hook") (o.nativeBuildInputs or []);
+          propagatedBuildInputs = builtins.filter
+            (x: (x.pname or "") != "brotli") (o.propagatedBuildInputs or []);
+          configureFlags = (o.configureFlags or []) ++ [ "--with-brotli=no" ];
+          postInstall = "";
         });
         libxcvt = prev.libxcvt.overrideAttrs (o: {
           patches = (o.patches or []) ++ [ ./patches/libxcvt-static-library.patch ];
+        });
+        # Same encodings-dir pin as staticFixes: the FreeType backend links it.
+        libfontenc = prev.libfontenc.overrideAttrs (o: {
+          configureFlags = (o.configureFlags or []) ++ [
+            "--with-fontrootdir=/zip/fonts"
+            "--with-encodingsdir=/zip/fonts/encodings"
+          ];
         });
         pixman = prev.pixman.overrideAttrs (o: {
           mesonFlags = (o.mesonFlags or []) ++ [ "-Dtests=disabled" "-Ddemos=disabled" ];
