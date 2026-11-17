@@ -1,0 +1,14 @@
+Build libxcvt as whatever default_library asks for (static here).
+
+lib/meson.build hardcodes shared_library(), which a static-only toolchain cannot
+link; library() honours -Ddefault_library=static.
+
+--- a/lib/meson.build
++++ b/lib/meson.build
+@@ -1,5 +1,5 @@
+ libxcvt_sources = ['libxcvt.c']
+-libxcvt = shared_library('xcvt',
++libxcvt = library('xcvt',
+                          libxcvt_sources,
+                          include_directories : inc,
+                          version: meson.project_version(),

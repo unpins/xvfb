@@ -36,10 +36,7 @@
       # bakes its encodingsdir as an embedded /nix/store string → pin to /zip.
       staticFixes = selfP: superP: {
         libxcvt = superP.libxcvt.overrideAttrs (o: {
-          postPatch = (o.postPatch or "") + ''
-            substituteInPlace lib/meson.build \
-              --replace-fail "shared_library('xcvt'," "library('xcvt',"
-          '';
+          patches = (o.patches or [ ]) ++ [ ./patches/libxcvt-static-library.patch ];
           mesonFlags = (o.mesonFlags or [ ]) ++ [ "-Ddefault_library=static" ];
         });
         # pixman's test/demo programs are not shipped, and `matrix-test` does its
@@ -102,10 +99,7 @@
             (x: (x.pname or x.name or "") != "freetype") (o.buildInputs or []);
         });
         libxcvt = prev.libxcvt.overrideAttrs (o: {
-          postPatch = (o.postPatch or "") + ''
-            substituteInPlace lib/meson.build \
-              --replace 'shared_library(' 'library('
-          '';
+          patches = (o.patches or []) ++ [ ./patches/libxcvt-static-library.patch ];
         });
         pixman = prev.pixman.overrideAttrs (o: {
           mesonFlags = (o.mesonFlags or []) ++ [ "-Dtests=disabled" "-Ddemos=disabled" ];
