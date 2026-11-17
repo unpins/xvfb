@@ -119,8 +119,8 @@ in
     ###### unpin-vfs runtime objects (darwin $CC; NEVER redefined) ######
     # -DNDEBUG: miniz's MZ_ASSERT is plain assert(); clang keeps its __FILE__
     # cstring = miniz.o's store-path in .rodata (survives strip → a foreign
-    # runtime ref). NDEBUG removes the assert. (gcc -O2 elides it on Linux, which
-    # is why the Linux build is ref-clean without NDEBUG.)
+    # runtime ref). NDEBUG removes the assert; Linux passes it for the same
+    # reason.
     vfsdir=$NIX_BUILD_TOP/vfsobj
     mkdir -p $vfsdir
     $CC -O2 -DNDEBUG -DMINIZ_USE_ZSTD -DUNPIN_VFS_SELF -DUNPIN_VFS_DIRS \

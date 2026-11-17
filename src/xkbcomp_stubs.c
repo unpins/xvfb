@@ -3,9 +3,9 @@
  * in-process library that only ever does file->file .xkm compilation, so these
  * are never reached; defining them here lets us avoid dragging in libX11.
  *
- * They are combined (ld -r) with the xkbcomp objects and then localized
- * (objcopy --keep-global-symbol=unpin_xkbcomp_main), so they become file-local
- * symbols inside the xkbcomp blob and never clash with libxkbfile / the server.
+ * They are merged with the xkbcomp objects (in LLVM IR on Linux, with ld -r on
+ * macOS and cosmo) and every symbol but unpin_xkbcomp_main is localized, so
+ * they never clash with libxkbfile / the server.
  */
 typedef struct _XDisplay Display;
 

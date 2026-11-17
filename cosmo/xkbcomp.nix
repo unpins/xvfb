@@ -40,8 +40,7 @@ c.stdenv.mkDerivation {
     runHook preBuild
     bison --defines=xkbparse.h -o xkbparse.c xkbparse.y
 
-    "''${CC_FOR_BUILD:-$CC_FOR_BUILD}" -O2 ${makekeysC} -o makekeys || \
-      "$CC_FOR_BUILD" -O2 ${makekeysC} -o makekeys
+    "$CC_FOR_BUILD" -O2 ${makekeysC} -o makekeys
     xkbproto=${c.xorg.xorgproto}/include/X11
     ./makekeys $xkbproto/keysymdef.h $xkbproto/XF86keysym.h \
                $xkbproto/Sunkeysym.h $xkbproto/DECkeysym.h \
