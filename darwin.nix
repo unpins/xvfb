@@ -56,11 +56,11 @@ let
     captureLinks = true;
   };
 
-  libxfont2NoFt = static.libxfont_2.overrideAttrs (o: {
-    configureFlags = (o.configureFlags or []) ++ [ "--disable-freetype" ];
-    buildInputs = builtins.filter
-      (x: (x.pname or x.name or "") != "freetype") (o.buildInputs or []);
-  });
+  libxfont2 = static.libxfont_2;
+  # FreeType (scalable fonts on the font path) and what static freetype needs.
+  ftLibs = with pkgs.lib; concatMapStringsSep " " (p: "-L${getLib p}/lib") [
+    static.freetype static.libpng static.bzip2 static.brotli
+  ] + " -lfreetype -lpng16 -lbz2 -lbrotlidec -lbrotlicommon";
 
   nullArgs = [ "libGL" "libGLU" "libdrm" "libepoxy" "mesa" "mesa-gl-headers"
                "dbus" "udev" "dri-pkgconfig-stub" "libxfont_1" ];
@@ -70,7 +70,7 @@ let
   overrides =
     (builtins.listToAttrs (map (n: { name = n; value = null; }) nullArgs))
     // (builtins.listToAttrs (map (n: { name = n; value = static.${n}; }) staticArgs))
-    // { libxfont_2 = libxfont2NoFt; };
+    // { libxfont_2 = libxfont2; };
 
   # The redefine map, generated from nix-lib's ONE spelling table (lib.vfsBindMap)
   # — the same table the engine's IR rename reads, so the two back-ends can never
@@ -139,7 +139,7 @@ in
       -c ${ulib.vfsCore}/unpin_zstd.c -o $vfsdir/unpin_zstd.o
 
     ###### VFS-localized copies of the external font lib + the xkbcomp blob ######
-    cp ${libxfont2NoFt}/lib/libXfont2.a $vfsdir/libXfont2_vfs.a
+    cp ${libxfont2}/lib/libXfont2.a $vfsdir/libXfont2_vfs.a
     chmod +w $vfsdir/libXfont2_vfs.a
     llvm-objcopy --redefine-syms=${redefMap} $vfsdir/libXfont2_vfs.a
     cp ${xkbcompObj}/xkbcomp_localized.o $vfsdir/blob_vfs.o
@@ -153,7 +153,7 @@ in
     # raw, which is where an object path belongs anyway.
     export NIX_CFLAGS_LINK="''${NIX_CFLAGS_LINK:-} \
       $vfsdir/vfs.o $vfsdir/miniz.o $vfsdir/unpin_zstd.o $vfsdir/blob_vfs.o \
-      -L${static.libfontenc}/lib -lfontenc -L${static.zlib}/lib -lz"
+      -L${static.libfontenc}/lib -lfontenc ${ftLibs} -L${static.zlib}/lib -lz"
   '';
 
   postBuild = (old.postBuild or "") + ''
