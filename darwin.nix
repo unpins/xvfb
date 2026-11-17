@@ -90,13 +90,10 @@ in
     "-Dxcsecurity=true"
   ];
 
-  postPatch = (old.postPatch or "") + ''
-    # In-process xkbcomp via mkstemp+fork+fmemopen (the cosmo variant is right for
-    # macOS too: darwin has fork/mkstemp/fmemopen). Build-host python3.
-    ${bpkgs.python3.interpreter} ${./cosmo/patch-ddxload-cosmo.py}
-    substituteInPlace meson.build \
-      --replace-fail "subdir('test')" "# subdir('test') removed (unpins: not shipped)"
-  '';
+  patches = (old.patches or [ ]) ++ [
+    ./patches/xkbcomp-inproc-tmpfile.patch
+    ./patches/xserver-no-test-subdir.patch
+  ];
 
   # Ship the binary as `xvfb` (== package name, required by action-build's
   # name-based verify/smoke); `Xvfb` is re-added as an embedded alias. The

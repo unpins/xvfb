@@ -36,18 +36,10 @@ static.xorg-server.overrideAttrs (old: {
     "-Dsha1=libmd" "-Ddefault_font_path=/zip/fonts/misc"
   ];
 
-  # Rewrite RunXkbComp to compile in-process (fork + unpin_xkbcomp_main), and
-  # drop the test-client suite (not shipped; would inherit the global link flags
-  # and break the cross static link).
-  postPatch = (old.postPatch or "") + ''
-    # Build-host python3 (pkgs is the TARGET set on a cross build; a shell-
-    # interpolated path doesn't splice like nativeBuildInputs, so reach for
-    # buildPackages explicitly or a cross build would compile python3 for the
-    # target — sqlite/python cross-fail on i686-musl).
-    ${pkgs.buildPackages.python3.interpreter} ${./patch-ddxload.py}
-    substituteInPlace meson.build \
-      --replace-fail "subdir('test')" "# subdir('test') removed (unpins: not shipped, breaks cross static link)"
-  '';
+  patches = (old.patches or [ ]) ++ [
+    ./patches/xkbcomp-inproc-memfd.patch
+    ./patches/xserver-no-test-subdir.patch
+  ];
 
   preBuild = (old.preBuild or "") + ''
     ###### unpin-vfs runtime objects (static musl $CC) ######

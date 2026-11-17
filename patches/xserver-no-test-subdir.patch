@@ -1,0 +1,19 @@
+Don't build the test-client suite.
+
+The tests are not shipped, and they would link with this build's global link
+flags, which breaks the static link on cross targets. Upstream skips the
+directory only on Windows; cosmo presents as non-Windows at build time.
+
+--- a/meson.build
++++ b/meson.build
+@@ -756,10 +756,6 @@
+ 
+ subdir('hw')
+ 
+-if host_machine.system() != 'windows'
+-    subdir('test')
+-endif
+-
+ install_man(configure_file(
+     input: 'man/Xserver.man',
+     output: 'Xserver.1',

@@ -11,7 +11,7 @@
 { cosmoPkgs, nixpkgs, xkbcompObj }:
 let
   c = cosmoPkgs;
-  # Native nixpkgs for build-host tools (python3, zip) and the ARCH-INDEPENDENT
+  # Native nixpkgs for build-host tools (zip) and the ARCH-INDEPENDENT
   # data trees (xkeyboard-config, core fonts) -- text/bitmap data, not cosmo
   # objects, so the native build is correct and avoids a cosmo rebuild.
   np = nixpkgs.legacyPackages."x86_64-linux";
@@ -31,7 +31,7 @@ let
 in
 c.xorg-server.overrideAttrs (o: {
   pname = "xvfb-cosmo";
-  nativeBuildInputs = (o.nativeBuildInputs or []) ++ [ np.python3 np.zip ];
+  nativeBuildInputs = (o.nativeBuildInputs or []) ++ [ np.zip ];
   buildInputs = dropJunk (o.buildInputs or []) ++ [ c.libmd ];
   propagatedBuildInputs = dropJunk (o.propagatedBuildInputs or []);
 
@@ -77,31 +77,11 @@ c.xorg-server.overrideAttrs (o: {
     "-Dlisten_tcp=true" "-Dlisten_unix=false"
   ];
 
-  # Rewrite RunXkbComp -> in-process fork + unpin_xkbcomp_main (cosmo variant:
-  # mkstemp temp files + fmemopen handoff, no memfd, no unlink-while-open).
-  postPatch = (o.postPatch or "") + ''
-    ${np.python3.interpreter} ${./patch-ddxload-cosmo.py}
-
-    # Drop the test-client suite for the same reason as the Linux build (not
-    # shipped; would inherit this build's link flags). subdir('test') is gated
-    # on non-Windows in meson.build, and cosmo presents as non-Windows at build
-    # time, so it would otherwise build.
-    substituteInPlace meson.build \
-      --replace-fail "subdir('test')" "# subdir('test') removed (unpins: not shipped)"
-
-    # cosmo headers expose SCM_RIGHTS, so meson enables XTRANS_SEND_FDS and the
-    # transport's SocketRead/Writev use recvmsg/sendmsg with an SCM_RIGHTS
-    # control buffer. On Windows that recvmsg returns -1/WSAEINVAL, so the server
-    # fails the very first read of a client's connection-setup and drops it.
-    # Xvfb needs no fd-passing (DRI3 off); disable it so SocketRead falls back to
-    # plain read()/writev(), which work on cosmo.
-    # --replace-fail: this edit is load-bearing for Windows correctness (a silent
-    # no-op would leave XTRANS_SEND_FDS on -> recvmsg/SCM_RIGHTS -> the server
-    # drops every client's connection-setup read on cosmo). Fail loudly on drift.
-    substituteInPlace include/meson.build \
-      --replace-fail "conf_data.set('XTRANS_SEND_FDS', '1')" \
-                     "conf_data.set('XTRANS_SEND_FDS', false)"
-  '';
+  patches = (o.patches or []) ++ [
+    ../patches/xkbcomp-inproc-tmpfile.patch
+    ../patches/xserver-no-test-subdir.patch
+    ../patches/xserver-cosmo-no-send-fds.patch
+  ];
 
   # Ship the binary as `xvfb` (== package name, required by action-build's
   # name-based verify/smoke). Rename BEFORE preFixup so apelinkHook turns

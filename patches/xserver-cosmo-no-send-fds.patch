@@ -1,0 +1,20 @@
+cosmo: don't pass fds over the X transport.
+
+cosmo's headers expose SCM_RIGHTS, so meson turns XTRANS_SEND_FDS on and the
+transport's SocketRead/Writev use recvmsg/sendmsg with an SCM_RIGHTS control
+buffer. On Windows that recvmsg fails with WSAEINVAL, so the server fails the
+first read of every client's connection setup and drops the client. Xvfb needs
+no fd passing (DRI3 is off); without it SocketRead falls back to plain
+read()/writev(), which work on cosmo.
+
+--- a/include/meson.build
++++ b/include/meson.build
+@@ -192,7 +192,7 @@
+ conf_data.set('LISTEN_LOCAL', get_option('listen_local'))
+ 
+ if cc.has_header_symbol('sys/socket.h', 'SCM_RIGHTS')
+-  conf_data.set('XTRANS_SEND_FDS', '1')
++  conf_data.set('XTRANS_SEND_FDS', false)
+ endif
+ 
+ if conf_data.get('HAVE_GETPEEREID').to_int() == 0 and conf_data.get('HAVE_GETPEERUCRED').to_int() == 0
