@@ -61,8 +61,8 @@
       # the escape hatches, so re-derive the set from the SAME nixpkgs with them —
       # exactly what the spike's importCross / darwin import did. Keyed off the
       # framework-passed platform so native and every cross/darwin reproduce the
-      # right (build, host) pair. (Drops the framework's LLD-link wrapper, which
-      # the spike never used — a uniform-linker nicety, not a correctness need.)
+      # right (build, host) pair. Linux gets the engine back through
+      # enginePkgsStaticFor in buildServer.
       allowUnsup = pkgs:
         let hp = pkgs.stdenv.hostPlatform; bp = pkgs.stdenv.buildPlatform; in
         import nixpkgs ({
@@ -74,10 +74,8 @@
         } // lib.optionalAttrs (hp != bp) { crossSystem = { config = hp.config; }; });
       # Inputs Xvfb (xvfb=true, all other DDXs=false) never uses. The GL stack is
       # dropped because we disable glamor/glx; libpciaccess/libxshmfence are
-      # Xorg-DDX-only (PCI probe / DRI fence) and nixpkgs marks them
-      # badPlatforms=static, so keeping them would need allowUnsupportedSystem
-      # (the spike's crutch) — dropping is cleaner and shrinks the closure. The
-      # cosmo path already drops the same set as "junk".
+      # Xorg-DDX-only (PCI probe / DRI fence), so dropping them shrinks the
+      # closure. The cosmo path already drops the same set as "junk".
       # libtirpc joins the list for the same reason: the build already passes
       # `-Dsecure-rpc=false`, so the server never calls it, but nixpkgs keeps it
       # as a buildInput, and it drags krb5 into the closure. We ship no KDC and
@@ -198,7 +196,7 @@
       name = "xvfb";
       # nixpkgs attr for the man graft / optimize overlay. xorg-server has no
       # clean top-level attr we want optimized, and the build is bespoke, so GC
-      # is off; man is harvested from the build's own share/man.
+      # is off; the man page comes from mkCuratedMan.
       pkgsAttr = "xorg-server";
       license = "MIT";
       optimize = { gc = false; };

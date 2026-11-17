@@ -1,7 +1,8 @@
 # Cosmo port of the spike's in-process xkbcomp blob: the entire client-side XKB
 # stack bundled into one relocatable .o exporting only unpin_xkbcomp_main,
-# depending on nothing but libc. Same recipe as the Linux mkXvfb xkbcompObj,
-# retargeted to the cosmocc pkg set + cosmo binutils + cosmo libX11.a/libxkbfile.a.
+# depending on nothing but libc. Same objects as ../linux-xkbcomp.nix, which
+# merges them in LLVM IR; here they are ELF, so the merge is ld -r + objcopy,
+# against the cosmocc pkg set + cosmo binutils + cosmo libX11.a/libxkbfile.a.
 { cosmoPkgs }:
 let
   c = cosmoPkgs;
@@ -14,7 +15,7 @@ let
   computeC = ../src/unpin_xkbcompute.c;
   stubsC = ../src/xkbcomp_stubs.c;
   # Cosmo ELF binutils (objects are ELF until apelink), derived from the cosmo
-  # cross stdenv — same as the Linux mkXvfb uses static.stdenv.cc.bintools. The
+  # cross stdenv, as ../linux-xkbcomp.nix takes static.stdenv.cc.bintools. The
   # unwrapped cosmo bintools ship ar/ld/nm/objcopy that shim to the matching
   # x86_64-linux-cosmo-* tools (mkBintoolsUnwrapped in nix-lib/cosmocc.nix).
   bintools = c.stdenv.cc.bintools.bintools;

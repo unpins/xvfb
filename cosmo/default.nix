@@ -2,7 +2,7 @@
 # apelinked to a Windows PE (Xvfb.exe). Functionally verified on a real Windows
 # VM: X11 handshake + request dispatch + in-process xkbcomp keymap compile.
 #
-# Structural differences from the Linux mkXvfb (see ../flake.nix):
+# Structural differences from the Linux build (see ../linux.nix):
 #   * VFS = cosmo's NATIVE zipos. fopen("/zip/..") is served from the APE's
 #     embedded zip section by cosmo's libc, so the whole --wrap/vfs.c/miniz
 #     machinery is GONE here; embedding is a plain `zip -r -9 Xvfb.exe ...`.
