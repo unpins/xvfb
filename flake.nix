@@ -54,14 +54,6 @@
             "--with-encodingsdir=/zip/fonts/encodings"
           ];
         });
-        # nixpkgs' postInstall points freetype-config at the TARGET's pkg-config,
-        # which the engine set builds with the gnu stdenv: every Linux cross then
-        # bootstrapped a cross gcc for a script nothing here runs.
-        freetype = superP.freetype.overrideAttrs (o: {
-          nativeBuildInputs = builtins.filter
-            (x: (x.name or "") != "make-shell-wrapper-hook") (o.nativeBuildInputs or [ ]);
-          postInstall = "";
-        });
       };
       # The X stack libs are marked `badPlatforms = static` (and pkgsStatic.python3
       # `broken`) in nixpkgs even though they build + link fine static (the spike
