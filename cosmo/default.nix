@@ -125,7 +125,10 @@ c.xorg-server.overrideAttrs (o: {
     # Append into the APE's zip section (cosmo serves the members at /zip/...).
     # InfoZIP preserves the non-zip PE/ELF prefix (SFX convention) and rewrites
     # the central directory at EOF, where cosmo's zipos scans for it.
-    ( cd $stage && zip -q -r -9 "$bin" xkb fonts )
+    # Reproducible: fixed mtimes (fonts.dir/alias are written at build time),
+    # sorted entries, no extra fields.
+    find $stage -exec touch -h -d @$SOURCE_DATE_EPOCH {} +
+    ( cd $stage && find xkb fonts -print | LC_ALL=C sort | zip -q -9 -X "$bin" -@ )
     echo "embedded /zip xkb tree + core fonts; Xvfb.exe now $(stat -c %s "$bin") bytes"
   '';
 
