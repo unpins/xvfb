@@ -52,6 +52,8 @@ c.xorg-server.overrideAttrs (o: {
       # re-listed at the end.
       "-L${c.libfontenc}/lib" "-lfontenc"
       "-L${c.lib.getLib c.freetype}/lib" "-lfreetype"
+      "-L${c.lib.getLib c.harfbuzz}/lib" "-lharfbuzz"
+      "-L${c.lib.getLib c.graphite2}/lib" "-lgraphite2"
       "-L${c.lib.getLib c.libpng}/lib" "-lpng16"
       "-L${c.lib.getLib c.bzip2}/lib" "-lbz2"
       "-L${c.lib.getLib c.brotli}/lib" "-lbrotlidec" "-lbrotlicommon"

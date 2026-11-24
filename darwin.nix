@@ -29,13 +29,24 @@
 let
   # libfontenc bakes its encodings dir into the binary as a store path; point
   # it at the embedded tree, as staticFixes does on Linux.
-  static = pkgs.pkgsStatic.extend (_: super: {
+  # freetype gets nix-lib's fix (harfbuzz linked in; without it the autohinter
+  # dlopens whatever libharfbuzz.0.dylib the Mac has). Gated on the static
+  # stage: this set collapses buildPackages into itself, and the build
+  # machine's freetype must stay nixpkgs' own.
+  static = pkgs.pkgsStatic.extend (final: super: {
     libfontenc = super.libfontenc.overrideAttrs (o: {
       configureFlags = (o.configureFlags or [ ]) ++ [
         "--with-fontrootdir=/zip/fonts"
         "--with-encodingsdir=/zip/fonts/encodings"
       ];
     });
+  } // pkgs.lib.optionalAttrs (super.stdenv.hostPlatform.isStatic or false) {
+    freetype = ulib.nativeFixes.freetype super;
+    harfbuzz = final.freetype.unpinHarfbuzz;
+    # nixpkgs' graphite2 takes freetype for an example program: a cycle now.
+    graphite2 = ulib.nativeFixes.graphite2 super;
+    # harfbuzz links glib, whose meson objc probe needs nix-lib's cross-file fix.
+    glib = ulib.nativeFixes.glib super;
   });
   bpkgs = pkgs.buildPackages;
   llvm = bpkgs.llvm;
@@ -57,10 +68,13 @@ let
   };
 
   libxfont2 = static.libxfont_2;
-  # FreeType (scalable fonts on the font path) and what static freetype needs.
-  ftLibs = with pkgs.lib; concatMapStringsSep " " (p: "-L${getLib p}/lib") [
-    static.freetype static.libpng static.bzip2 static.brotli
-  ] + " -lfreetype -lpng16 -lbz2 -lbrotlidec -lbrotlicommon";
+  # FreeType (scalable fonts on the font path) and what static freetype needs,
+  # from its own .pc: harfbuzz brings graphite2, glib and frameworks. glib.pc
+  # requires sysprof-capture and pcre2, which nixpkgs does not propagate, and
+  # names -lintl/-liconv, which have no .pc — hence the explicit -L.
+  ftPcPath = with pkgs.lib; concatMapStringsSep ":" (p: "${getDev p}/lib/pkgconfig:${getDev p}/share/pkgconfig") (with static; [
+    freetype harfbuzz graphite2 glib libsysprof-capture pcre2 zlib bzip2 libpng brotli
+  ]);
 
   nullArgs = [ "libGL" "libGLU" "libdrm" "libepoxy" "mesa" "mesa-gl-headers"
                "dbus" "udev" "dri-pkgconfig-stub" "libxfont_1" ];
@@ -146,6 +160,8 @@ in
     llvm-objcopy --redefine-syms=${redefMap} $vfsdir/blob_vfs.o
 
     ###### wire the link ######
+    ftLibs=$(PKG_CONFIG_PATH=${ftPcPath} ${bpkgs.pkg-config-unwrapped}/bin/pkg-config --static --libs freetype2)
+    case "$ftLibs" in *-lharfbuzz*) ;; *) echo "FATAL: freetype2 link flags: '$ftLibs'" >&2; exit 1 ;; esac
     # NIX_CFLAGS_LINK, not NIX_LDFLAGS: the cc wrapper `-Wl,`-prefixes every
     # NIX_LDFLAGS token that does not start with `-L/`, and the engine clang does
     # not lower `-Wl,<path>` — it hands the token to ld64.lld whole, which then
@@ -153,7 +169,9 @@ in
     # raw, which is where an object path belongs anyway.
     export NIX_CFLAGS_LINK="''${NIX_CFLAGS_LINK:-} \
       $vfsdir/vfs.o $vfsdir/miniz.o $vfsdir/unpin_zstd.o $vfsdir/blob_vfs.o \
-      -L${static.libfontenc}/lib -lfontenc ${ftLibs} -L${static.zlib}/lib -lz"
+      -L${static.libfontenc}/lib -lfontenc \
+      -L${pkgs.lib.getLib static.gettext}/lib -L${pkgs.lib.getDev static.libiconv}/lib $ftLibs \
+      -L${static.zlib}/lib -lz"
   '';
 
   postBuild = (old.postBuild or "") + ''
@@ -193,11 +211,14 @@ in
       echo "FATAL: Xvfb links non-libSystem dylibs:" >&2; echo "$bad" >&2; exit 1
     fi
     # llvm-nm (cross stdenv has no bare nm on PATH; llvm-nm reads any arch).
-    if llvm-nm hw/vfb/Xvfb | grep -qw _unpinvfs_open; then
-      echo "VFS shims linked in: $(llvm-nm hw/vfb/Xvfb | grep -c _unpinvfs_)"
+    # Into a variable first: `llvm-nm | grep -q` closes the pipe on the first
+    # match, llvm-nm dies of SIGPIPE, and pipefail reports a miss.
+    nmout="$(llvm-nm hw/vfb/Xvfb)"
+    if grep -qw _unpinvfs_open <<<"$nmout"; then
+      echo "VFS shims linked in: $(grep -c _unpinvfs_ <<<"$nmout")"
     else
       echo "FATAL: _unpinvfs_open not in the final image (relink lost the VFS)" >&2
-      llvm-nm hw/vfb/Xvfb | grep -i unpinvfs || true
+      grep -i unpinvfs <<<"$nmout" || true
       exit 1
     fi
   '';

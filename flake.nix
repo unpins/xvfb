@@ -94,11 +94,27 @@
         # nixpkgs wraps freetype-config with makeWrapper, which needs a bash
         # built for the host (it skips the wrap on mingw for the same reason);
         # bash does not build for cosmo, and nothing here runs freetype-config.
-        freetype = prev.freetype.overrideAttrs (o: {
-          nativeBuildInputs = builtins.filter
-            (x: (x.name or "") != "make-shell-wrapper-hook") (o.nativeBuildInputs or []);
-          postInstall = "";
+        #
+        # Then nix-lib's fix: harfbuzz linked in, or the autohinter tries to
+        # dlopen a libharfbuzz at run time. Without glib here: in harfbuzz it
+        # only supplies an alternative set of Unicode functions (hb-glib) next
+        # to harfbuzz's own tables, and glib does not build with cosmocc.
+        freetype = ulib.nativeFixes.freetype (prev // {
+          freetype = prev.freetype.overrideAttrs (o: {
+            nativeBuildInputs = builtins.filter
+              (x: (x.name or "") != "make-shell-wrapper-hook") (o.nativeBuildInputs or []);
+            postInstall = "";
+          });
+          harfbuzz = prev.harfbuzz.overrideAttrs (o: {
+            buildInputs = builtins.filter (x: (x.pname or "") != "glib") (o.buildInputs or [ ]);
+            nativeBuildInputs = builtins.filter (x: (x.pname or "") != "glib") (o.nativeBuildInputs or [ ]);
+            mesonFlags = (o.mesonFlags or [ ])
+              ++ [ "-Dglib=disabled" "-Dgobject=disabled" "-Dtests=disabled" ];
+          });
         });
+        harfbuzz = final.freetype.unpinHarfbuzz;
+        # nixpkgs' graphite2 takes freetype for an example program: a cycle now.
+        graphite2 = ulib.nativeFixes.graphite2 prev;
         # Cosmo links static-only, but its pkg-config runs without --static, so
         # libbrotlidec's Requires.private (libbrotlicommon) never reached a link:
         # freetype's consumers died on undefined _kBrotli*. With no shared
